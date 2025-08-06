@@ -1,0 +1,46 @@
+ssis
+	official prerequisites : https://learn.microsoft.com/en-us/sql/integration-services/install-windows/install-integration-services?view=sql-server-ver17
+	host
+		os : windows
+		run-time
+		firewall ports
+		other features : powershell remoting
+	hw
+		cpu
+		ram : +(16 - 32) GB
+		storage
+airflow
+	official prerequisites : https://airflow.apache.org/docs/apache-airflow/stable/installation/prerequisites.html
+	core
+		version : latest
+		host
+			os : linux
+			run-time : python 3.12
+			firewall ports
+		hw
+			cpu
+			ram : + 16 GB
+			storage
+	db - postgresql
+		official prerequisites : https://www.postgresql.org/download/
+		version : 16
+		host
+			os : 
+			run-time
+			firewall ports : 5432
+		hw
+			cpu
+			ram : + 16 GB
+			storage
+meltano
+	official prerequisites : https://docs.meltano.com/getting-started/installation/
+	version : latest
+	host
+		os : linux
+		run-time : python 3.12
+		firewall ports
+		other features : ssh
+	hw
+		cpu
+		ram : +32 GB
+		storage
