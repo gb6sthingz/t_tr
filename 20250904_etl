@@ -1,0 +1,80 @@
+postgresql
+	install // https://www.postgresql.org/download/
+	smoke test
+		systemd // sys & service manager
+			systemctl status <postgresql>
+		psql --version
+		sudo -i -u postgres
+	// https://www.postgresql.org/docs/16/install-post.html#INSTALL-POST-ENV-VARS
+	https://www.postgresql.org/docs/16/runtime.html
+		changing default db location on disk x
+			https://www.postgresql.org/docs/16/creating-cluster.html
+	authentication type // https://www.postgresql.org/docs/9.4/auth-methods.html
+	logins //verify
+		.
+			airflow
+		create role AppUser with login password 'strongpassword';
+		grant connect on database AppDb to AppUser;
+		alter database AppDb owner to AppUser;
+	fw
+		Check postgresql.conf for listen_addresses.
+		Update pg_hba.conf for client authentication rules.
+	tls
+		certificate x
+		force for all connections
+	?dbs
+		https://www.postgresql.org/docs/16/tutorial-createdb.html
+		?airflow
+	smoke test
+		https://www.postgresql.org/docs/16/tutorial-accessdb.html
+meltano
+	py installation
+		pipx install "meltano" // https://docs.meltano.com/getting-started/installation/
+		.
+			<cd parent where Meltano should be>
+			<path to python> -m venv Meltano
+			cd Meltano
+			bin/activate
+			pip install --upgrade pip
+			pip install "meltano"
+	smoke tests
+		meltano --version //td verify
+	//
+		https://docs.meltano.com/reference/settings#database_uri
+		state db - local file
+		?db creation script
+		<source db> drivers
+		meltano taps
+			sql server
+				https://hub.meltano.com/extractors/tap-mssql/
+				https://hub.meltano.com/loaders/target-mssql/
+airflow
+	py install
+	smoke test
+		airflow version
+	.
+		https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/index.html
+		https://airflow.apache.org/docs/apache-airflow/stable/security/index.html#
+	?db creation script
+	airflow 2 postgresql
+		config
+			address to postgresql
+				[database]
+				sql_alchemy_conn
+				or env AIRFLOW__DATABASE__SQL_ALCHEMY_CONN 
+				https://airflow.apache.org/docs/apache-airflow/stable/howto/set-up-database.html
+				e.g. postgresql://u:pw@localhost/airflow_state
+				https://docs.sqlalchemy.org/en/14/core/engines.html
+			create db
+				airflow db migrate
+					https://airflow.apache.org/docs/apache-airflow/stable/howto/set-up-database.html#initialize-the-database
+			airflow db clean
+			monitoring db perf
+	https://airflow.apache.org/docs/apache-airflow/2.5.2/administration-and-deployment/security/webserver.html#web-authentication
+	drivers
+		https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver17&tabs=redhat18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline
+	entra
+		itn: https://airflow.apache.org/docs/apache-airflow/stable/security/index.html
+	smoke tests
+		airflow webserver --port 8080
+		airflow scheduler
