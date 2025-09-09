@@ -1,0 +1,21 @@
+exec sys.sp_configure n'show advanced options', n'1'  reconfigure with override
+go
+exec sys.sp_configure n'max server memory (mb)', n'61440' -- 60 GB
+go
+reconfigure with override
+
+select
+		s1 = 
+			N'alter database tempdb modify file(
+				name = [' + cast(name as varchar(max)) + N']
+				,filename = ''d:\...\' + cast(name as varchar(max)) + N'.' + cast(iif((type = 1), 'l', 'm') as varchar(max)) + N'df''
+			)'
+		,s2 = 
+			N'alter database tempdb modify file(
+				name = [' + cast(name as varchar(max)) + N']
+				,size = xxx GB
+				,maxsize = unlimited
+				,filegrowth = xx GB
+			)'
+		,*
+	from tempdb.sys.database_files
