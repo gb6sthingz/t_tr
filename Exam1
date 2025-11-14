@@ -1,0 +1,161 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Hashing;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace Exam1 {
+    public class Exam1a {
+		public static string s1(string Fp, string Fp_Output) {
+			const int ChunkWidth = 40;
+
+			if (Fp is null || Fp.Length == 0) { throw new Exception(); }
+			if (!File.Exists(Fp)) { throw new Exception(); }
+
+			var Rv = new StringBuilder();
+			var OriginalBytes = File.ReadAllBytes(Fp);
+			var Base32Value = Base32Encoder.Encode(OriginalBytes);
+			var RoundtripBytes = Base32Encoder.Decode(Base32Value);
+			if (!AreEqual(OriginalBytes, RoundtripBytes)) { throw new InvalidOperationException("roundtrip base32 conversion did not produce identical bytes."); }
+
+			var Rows = SplitIntoChunks(Base32Value, ChunkWidth);
+			var RowCountLength = Rows.Count.ToString().Length;
+			for (int Index = 0; Index < Rows.Count; Index++) {
+				var Value = Rows[Index];
+				var ValueBytes = Encoding.UTF8.GetBytes(Value);
+
+				var HashValue = XxHash32.HashToUInt32(ValueBytes);
+				string HashText = HashValue.ToString("X8");
+
+				Rv.AppendLine($"{Index.ToString().PadLeft(RowCountLength)}:{Format(HashText)}:{Format(Value)}");
+				string Format(string Input) => Regex.Replace(Input, @".", "$0 ");
+			}
+			if (Fp_Output != null) { File.WriteAllText(Fp_Output, Rv.ToString()); }
+			return Rv.ToString();
+		}
+
+		private static bool AreEqual(byte[] Left, byte[] Right) {
+			if (ReferenceEquals(Left, Right)) {
+				return true;
+			}
+
+			if (Left is null || Right is null) {
+				return false;
+			}
+
+			if (Left.Length != Right.Length) {
+				return false;
+			}
+
+			for (int Index = 0; Index < Left.Length; Index++) {
+				if (Left[Index] != Right[Index]) {
+					return false;
+				}
+			}
+
+			return true;
+		}
+
+		private static List<string> SplitIntoChunks(string Value, int Width) {
+			if (Value is null) { throw new ArgumentNullException(nameof(Value)); }
+			if (Width <= 0) { throw new ArgumentOutOfRangeException(nameof(Width), "width must be positive."); }
+
+			List<string> Result = new List<string>((Value.Length + Width - 1) / Width);
+			for (int Index = 0; Index < Value.Length; Index += Width) {
+				int Remaining = Value.Length - Index;
+				int Length = Remaining < Width ? Remaining : Width;
+				string Chunk = Value.Substring(Index, Length);
+				Result.Add(Chunk);
+			}
+
+			return Result;
+		}
+	}
+
+	internal static class Base32Encoder {
+		private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+		public static string Encode(byte[] Data) {
+			if (Data is null) {
+				throw new ArgumentNullException(nameof(Data));
+			}
+
+			if (Data.Length == 0) {
+				return string.Empty;
+			}
+
+			int OutputLength = (int)Math.Ceiling(Data.Length * 8.0 / 5.0);
+			char[] Output = new char[OutputLength];
+
+			int Buffer = Data[0];
+			int NextByteIndex = 1;
+			int BitsLeft = 8;
+			int OutputIndex = 0;
+
+			while (BitsLeft > 0 || NextByteIndex < Data.Length) {
+				if (BitsLeft < 5) {
+					if (NextByteIndex < Data.Length) {
+						Buffer <<= 8;
+						Buffer |= Data[NextByteIndex++] & 0xFF;
+						BitsLeft += 8;
+					}
+					else {
+						int PaddingBits = 5 - BitsLeft;
+						Buffer <<= PaddingBits;
+						BitsLeft += PaddingBits;
+					}
+				}
+
+				int AlphabetIndex = (Buffer >> (BitsLeft - 5)) & 0x1F;
+				BitsLeft -= 5;
+
+				Output[OutputIndex++] = Alphabet[AlphabetIndex];
+			}
+
+			return new string(Output, 0, OutputIndex);
+		}
+
+		public static byte[] Decode(string Text) {
+			if (Text is null) {
+				throw new ArgumentNullException(nameof(Text));
+			}
+
+			if (Text.Length == 0) {
+				return Array.Empty<byte>();
+			}
+
+			List<byte> Bytes = new List<byte>((Text.Length * 5) / 8);
+			int Buffer = 0;
+			int BitsLeft = 0;
+
+			for (int Index = 0; Index < Text.Length; Index++) {
+				char Character = Text[Index];
+
+				if (char.IsWhiteSpace(Character)) {
+					continue;
+				}
+
+				char Upper = char.ToUpperInvariant(Character);
+				int AlphabetIndex = Alphabet.IndexOf(Upper, StringComparison.Ordinal);
+
+				if (AlphabetIndex < 0) {
+					throw new FormatException($"invalid base32 character '{Character}' at position {Index}.");
+				}
+
+				Buffer <<= 5;
+				Buffer |= AlphabetIndex & 0x1F;
+				BitsLeft += 5;
+
+				if (BitsLeft >= 8) {
+					int Shift = BitsLeft - 8;
+					byte ByteValue = (byte)((Buffer >> Shift) & 0xFF);
+					BitsLeft -= 8;
+					Bytes.Add(ByteValue);
+				}
+			}
+
+			return Bytes.ToArray();
+		}
+	}
+}
