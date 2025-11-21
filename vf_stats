@@ -1,0 +1,15 @@
+select
+		f.physical_name
+		,f.type_desc
+		,(1. * io_stall_read_ms) / num_of_reads as avg_io_stall_read_ms
+		,(1. * io_stall_write_ms) / num_of_writes as avg_io_stall_write_ms
+		,num_of_bytes_read as read_bytes
+		,num_of_bytes_written as written_bytes
+		,1. * num_of_bytes_read / num_of_reads as avg_read_length_bytes
+		,1. * num_of_bytes_written / num_of_writes as avg_write_length_bytes
+		,sys_info.sqlserver_start_time
+		,f_stats.*
+	from sys.database_files as f
+		cross apply sys.dm_io_virtual_file_stats(db_id(), f.file_id) as f_stats
+		cross join sys.dm_os_sys_info as sys_info
+	order by 2, 1
