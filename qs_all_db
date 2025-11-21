@@ -1,0 +1,111 @@
+drop table if exists ##s1_9d7bdae48be3445d92c372f566f1580d
+;with
+	s1 as (
+		select
+			top (50)
+				cast('' as sysname) as db_name
+				,max(RunOn.start_time) as last_start_time
+				,Queries.query_hash                       
+				,max(object_schema_name(Queries.object_id, db_id(cast('' as sysname))) + ' ' + object_name(Queries.object_id, db_id(cast('' as sysname)))) as n2
+				,min(QueryTexts.query_sql_text) as query_sql_text_tsql
+				,count_big(*) as ct
+				,sum(RtStats.count_executions) as count_executions
+				,sum((RtStats.count_executions * RtStats.avg_duration)) as total_avg_duration_mcs
+				,sum((RtStats.count_executions * RtStats.avg_cpu_time)) as total_avg_cpu_time_mcs
+				,sum((RtStats.count_executions * RtStats.avg_clr_time)) as total_avg_clr_time_mcs
+				,sum((RtStats.count_executions * RtStats.avg_num_physical_io_reads)) as total_avg_num_physical_io_reads_1
+				,sum((RtStats.count_executions * RtStats.avg_physical_io_reads)) as total_avg_physical_io_reads_pages
+				,sum((RtStats.count_executions * RtStats.avg_logical_io_reads)) as total_avg_logical_io_reads_pages
+				,sum((RtStats.count_executions * RtStats.avg_logical_io_writes)) as total_avg_logical_io_writes_pages
+				,sum((RtStats.count_executions * RtStats.avg_tempdb_space_used)) as total_avg_tempdb_space_used_pages
+				,sum((RtStats.count_executions * RtStats.avg_query_max_used_memory)) as total_avg_query_max_used_memory_pages
+				,sum((RtStats.count_executions * RtStats.avg_log_bytes_used)) as total_avg_log_bytes_used_bytes
+				,sum((RtStats.count_executions * RtStats.avg_rowcount)) as total_avg_rowcount_1
+				,1. * case when min(iif((RtStats.execution_type = 0), RtStats.avg_logical_io_reads, 9223372036854775807)) != 0 and min(iif((RtStats.execution_type = 0), RtStats.avg_logical_io_reads, 9223372036854775807)) is not null then ( (1. * max(RtStats.avg_logical_io_reads)) / (min(iif((RtStats.execution_type = 0), RtStats.avg_logical_io_reads, 9223372036854775807))) ) else null end as logical_io_reads_max2min_ratio                                                                                                                    
+				,min(Plans.query_plan_hash) as query_plan_hash
+				,cast('' as sysname) as vrldbn
+			from sys.query_store_query_text as QueryTexts
+				inner join sys.query_store_query as Queries on Queries.query_text_id = QueryTexts.query_text_id
+				inner join sys.query_store_plan as Plans on Plans.query_id = Queries.query_id
+				inner join sys.query_store_runtime_stats as RtStats on RtStats.plan_id = Plans.plan_id
+				inner join sys.query_store_runtime_stats_interval as RunOn on RunOn.runtime_stats_interval_id = RtStats.runtime_stats_interval_id
+			where
+				RunOn.start_time >= (getdate() - 7)
+		                             
+			group by
+				query_hash
+			order by total_avg_tempdb_space_used_pages desc
+	)
+	select
+		top (0)
+			*
+		into ##s1_9d7bdae48be3445d92c372f566f1580d
+		from s1
+	
+declare @db_name_delimited nvarchar(max)
+declare @db_name_as_string nvarchar(max)
+declare @db_name_as_string_body nvarchar(max)
+declare my_cursor cursor local forward_only fast_forward read_only for
+	select
+			quotename(name) as db_name_delimited
+			,'''' + replace(name, '''', '''''') + '''' as db_name_as_string
+			,replace(name, '''', '''''') as db_name_as_string_body
+		from sys.databases
+		order by 1
+open my_cursor
+while 1 = 1 begin
+	fetch next from my_cursor into
+		@db_name_delimited
+		,@db_name_as_string
+		,@db_name_as_string_body
+	if @@fetch_status != 0 break
+	declare @sql nvarchar(max) = '
+		drop table if exists #t
+		select
+			top (50)
+				' + @db_name_as_string + ' as db_name
+				,max(RunOn.start_time) as last_start_time
+				,Queries.query_hash                       
+				,max(object_schema_name(Queries.object_id, db_id(' + @db_name_as_string + ')) + '' '' + object_name(Queries.object_id, db_id(' + @db_name_as_string + '))) as n2
+				,min(QueryTexts.query_sql_text) as query_sql_text_tsql
+				,count_big(*) as ct
+				,sum(RtStats.count_executions) as count_executions
+				,sum((RtStats.count_executions * RtStats.avg_duration)) as total_avg_duration_mcs
+				,sum((RtStats.count_executions * RtStats.avg_cpu_time)) as total_avg_cpu_time_mcs
+				,sum((RtStats.count_executions * RtStats.avg_clr_time)) as total_avg_clr_time_mcs
+				,sum((RtStats.count_executions * RtStats.avg_num_physical_io_reads)) as total_avg_num_physical_io_reads_1
+				,sum((RtStats.count_executions * RtStats.avg_physical_io_reads)) as total_avg_physical_io_reads_pages
+				,sum((RtStats.count_executions * RtStats.avg_logical_io_reads)) as total_avg_logical_io_reads_pages
+				,sum((RtStats.count_executions * RtStats.avg_logical_io_writes)) as total_avg_logical_io_writes_pages
+				,sum((RtStats.count_executions * RtStats.avg_tempdb_space_used)) as total_avg_tempdb_space_used_pages
+				,sum((RtStats.count_executions * RtStats.avg_query_max_used_memory)) as total_avg_query_max_used_memory_pages
+				,sum((RtStats.count_executions * RtStats.avg_log_bytes_used)) as total_avg_log_bytes_used_bytes
+				,sum((RtStats.count_executions * RtStats.avg_rowcount)) as total_avg_rowcount_1
+				,1. * case when min(iif((RtStats.execution_type = 0), RtStats.avg_logical_io_reads, 9223372036854775807)) != 0 and min(iif((RtStats.execution_type = 0), RtStats.avg_logical_io_reads, 9223372036854775807)) is not null then ( (1. * max(RtStats.avg_logical_io_reads)) / (min(iif((RtStats.execution_type = 0), RtStats.avg_logical_io_reads, 9223372036854775807))) ) else null end as logical_io_reads_max2min_ratio                                                                                                                    
+				,min(Plans.query_plan_hash) as query_plan_hash
+				,' + @db_name_as_string + ' as vrldbn
+			into #t
+			from ' + @db_name_delimited + '.sys.query_store_query_text as QueryTexts
+				inner join ' + @db_name_delimited + '.sys.query_store_query as Queries on Queries.query_text_id = QueryTexts.query_text_id
+				inner join ' + @db_name_delimited + '.sys.query_store_plan as Plans on Plans.query_id = Queries.query_id
+				inner join ' + @db_name_delimited + '.sys.query_store_runtime_stats as RtStats on RtStats.plan_id = Plans.plan_id
+				inner join ' + @db_name_delimited + '.sys.query_store_runtime_stats_interval as RunOn on RunOn.runtime_stats_interval_id = RtStats.runtime_stats_interval_id
+			where
+				RunOn.start_time >= (getdate() - 7)
+				                             
+			group by
+				query_hash
+			order by total_avg_tempdb_space_used_pages desc
+		
+		insert into ##s1_9d7bdae48be3445d92c372f566f1580d
+			select
+					*
+				from #t
+	'
+	exec sp_executesql @sql;
+end;
+close my_cursor;
+deallocate my_cursor;
+select
+		*
+	from ##s1_9d7bdae48be3445d92c372f566f1580d
