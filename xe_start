@@ -1,0 +1,34 @@
+	if exists (select * from sys.server_event_sessions where name = 'DeleteMe') drop event session DeleteMe on server;
+create event session DeleteMe on server
+	add event sqlserver.rpc_completed
+	(
+		action(
+			sqlserver.client_hostname
+			,sqlserver.username
+		)
+		where(
+			is_system = (0)
+			and sqlserver.client_app_name like '%Management Studio%'
+			and sqlserver.username like 'DeleteMe%'
+		)
+	)
+	,add event sqlserver.sql_batch_completed
+	(
+		action(
+			sqlserver.client_hostname
+			,sqlserver.username
+		)
+		where(
+			is_system = (0)
+			and sqlserver.client_app_name like '%Management Studio%'
+			and sqlserver.username like 'DeleteMe%'
+		)
+	)
+	add target
+		package0.ring_buffer
+	with (
+		event_retention_mode = allow_multiple_event_loss
+		,max_dispatch_latency = 30 seconds
+		,startup_state = off
+	)
+alter event session DeleteMe on server state = start;
