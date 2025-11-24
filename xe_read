@@ -1,0 +1,45 @@
+	--
+		drop table if exists #XeRingBuffer
+		create table #XeRingBuffer(id int identity not null primary key, TargetData xml not null)
+		create primary xml index T__XeRingBuffer on #XeRingBuffer(TargetData)
+		create xml index T__XeRingBuffer__value on #XeRingBuffer(TargetData) using xml index T__XeRingBuffer for value
+		create xml index T__XeRingBuffer__path on #XeRingBuffer(TargetData) using xml index T__XeRingBuffer for path
+		create xml index T__XeRingBuffer__property on #XeRingBuffer(TargetData) using xml index T__XeRingBuffer for property
+		insert into #XeRingBuffer
+			select
+					 cast(target_data as xml)
+				from sys.dm_xe_session_targets
+				where event_session_address = (
+							select
+									 address
+								from sys.dm_xe_sessions
+								where name = 'DeleteMe'
+						)
+		;with
+			s1 as (
+				select
+						 Nodes.query('.') as Event
+					from #XeRingBuffer
+						cross apply TargetData.nodes('RingBufferTarget/event') as T(Nodes)
+			)
+			select
+					Event.value('(event/@name)[1]', 'varchar(max)') as name
+					,Event.value('(event/@timestamp)[1]', 'varchar(max)') as timestamp
+					,Event.value('(/event/data[@name="duration"]/value/text())[1]', 'bigint') as duration_mcs
+					,Event.value('(/event/data[@name="cpu_time"]/value/text())[1]', 'bigint') as cpu_time_mcs
+					,Event.value('(/event/data[@name="physical_reads"]/value/text())[1]', 'bigint') as physical_reads_pages
+					,Event.value('(/event/data[@name="page_server_reads"]/value/text())[1]', 'bigint') as page_server_reads_pages
+					,Event.value('(/event/data[@name="logical_reads"]/value/text())[1]', 'bigint') as logical_reads_pages
+					,Event.value('(/event/data[@name="writes"]/value/text())[1]', 'bigint') as writes_pages
+					,Event.value('(/event/data[@name="spills"]/value/text())[1]', 'bigint') as spills_pages
+					,Event.value('(/event/data[@name="row_count"]/value/text())[1]', 'bigint') as row_count
+					,Event.value('(/event/data[@name="severity"]/value/text())[1]', 'bigint') as severity
+					,Event.value('(/event/data[@name="statement"]/value/text())[1]', 'nvarchar(max)') as statement
+					,Event.value('(/event/data[@name="batch_text"]/value/text())[1]', 'nvarchar(max)') as batch_text
+					,Event.value('(/event/data[@name="message"]/value/text())[1]', 'nvarchar(max)') as message
+					,Event.value('(/event/action[@name="username"]/value/text())[1]', 'nvarchar(max)') as username
+					,Event.value('(/event/action[@name="client_hostname"]/value/text())[1]', 'nvarchar(max)') as client_hostname
+					,Event.value('(/event/action[@name="attach_activity_id"]/value/text())[1]', 'nvarchar(max)') as attach_activity_id
+					,Event
+				from s1
+
