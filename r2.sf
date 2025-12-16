@@ -1,0 +1,92 @@
+;with
+	s1 as (
+		select
+				*
+				,iif((estimate_row_count = 0), null, row_count / (estimate_row_count / 100.)) as row_count_estimate_skew_in_percent
+			from sys.dm_exec_query_profiles
+	)
+	,s2 as (
+		select
+				session_id, request_id
+				,row_count_estimate_skew_in_percent
+				,row_number() over(partition by session_id, request_id order by row_count_estimate_skew_in_percent desc) as g_id
+			from s1
+	)
+	,s3 as (
+		select
+				*
+			from s2
+			where g_id = 1
+	)
+	select
+			Sessions.original_login_name
+			,Sessions.session_id
+			,Requests.blocking_session_id 
+			,iif(Sessions.program_name like 'SQLAgent - TSQL JobStep (Job 0x%', 1, 0) as is_agent_job
+			,Requests.start_time as request_start_time
+			,Requests.command
+			,substring(SQLText.text,
+				Requests.statement_start_offset / 2 + 1,
+				((
+					iif((Requests.statement_end_offset = -1), datalength(SQLText.text), Requests.statement_end_offset - Requests.statement_start_offset)
+				) / 2)
+				+ 1) as statement_tsql
+			,iif((substring(SQLText.text,
+						Requests.statement_start_offset / 2 + 1,
+						((
+							iif((Requests.statement_end_offset = -1), datalength(SQLText.text), Requests.statement_end_offset - Requests.statement_start_offset)
+						) / 2)
+						+ 1) = SQLText2.event_info), '===', SQLText2.event_info) as rpcx_tsql
+			,Requests.status
+			,Requests.total_elapsed_time
+			,MGrants.query_cost
+			,estimates.row_count_estimate_skew_in_percent
+			,iif((Requests.total_elapsed_time = 0), null, Requests.wait_time / (Requests.total_elapsed_time / 100.)) as wait_time_as_percentage_of_duration
+			,Requests.wait_time
+			,Requests.wait_type
+			,Requests.cpu_time
+			,Requests.dop
+			,Requests.parallel_worker_count
+			,Requests.logical_reads
+			,Requests.reads
+			,Requests.writes
+			,Requests.granted_query_memory
+			,Sessions.last_request_start_time as rpc_start_time
+			,db_name(Sessions.database_id) as database_name
+			,Requests.wait_resource
+			,Requests.transaction_isolation_level
+			,Requests.open_transaction_count
+			,Requests.lock_timeout
+			,Requests.deadlock_priority
+			,Sessions.host_name
+			,Sessions.program_name
+			,Sessions.host_process_id
+			,Sessions.client_version
+			,Sessions.client_interface_name
+			,RgGroups.name as RgW
+			,Requests.sql_handle
+			,Requests.statement_sql_handle
+			,Requests.plan_handle
+			,Requests.statement_start_offset
+			,Requests.statement_end_offset
+			,Requests.query_hash
+			,Requests.query_plan_hash
+			,Requests.connection_id
+		from sys.dm_exec_sessions as Sessions
+			inner join sys.dm_exec_requests as Requests on Requests.session_id = Sessions.session_id
+			outer apply sys.dm_exec_input_buffer(Requests.session_id, Requests.request_id) as SQLText2
+			left outer join sys.dm_exec_query_memory_grants as MGrants on 
+				MGrants.session_id = Requests.session_id
+				and MGrants.request_id = Requests.request_id
+			left outer join sys.resource_governor_workload_groups as RgGroups on RgGroups.group_id = Sessions.group_id
+			outer apply sys.dm_exec_sql_text(Requests.plan_handle) as SQLText
+			left outer join s3 as estimates on 
+				estimates.session_id = Requests.session_id
+				and estimates.request_id = Requests.request_id
+		where
+			1 = 1
+			and Sessions.is_user_process = 1
+		order by
+			iif((Requests.request_id is not null), 0, 1)
+			,Sessions.is_user_process desc
+			,Sessions.session_id desc
