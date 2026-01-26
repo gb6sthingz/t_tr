@@ -1,0 +1,81 @@
+drop table if exists ##s1_9d7bdae48be3445d92c372f566f1580d
+;with
+	s1 as (
+		select
+				cast('' as sysname) as db_name
+				,min((s.name + ' ' + o.name + ' ')) as n2
+				,min(i.name) as i_name                        
+				,min(i.type_desc) as i_type_desc
+				,sum(used_page_count) as used_pages
+				,sum(reserved_page_count) as reserved_pages
+				,sum(row_count) as row_count
+			from sys.dm_db_partition_stats as p_stats
+				inner join sys.objects as o on o.object_id = p_stats.object_id
+				inner join sys.schemas as s on s.schema_id = o.schema_id
+				inner join sys.indexes as i on 
+					i.object_id = p_stats.object_id
+					and i.index_id = p_stats.index_id
+			where
+				o.is_ms_shipped = 0
+			group by
+				o.object_id
+	)
+	select
+		top (0)
+			*
+		into ##s1_9d7bdae48be3445d92c372f566f1580d
+		from s1
+	
+declare @db_name_delimited nvarchar(max)
+declare @db_name_as_string nvarchar(max)
+declare @db_name_as_string_body nvarchar(max)
+declare my_cursor cursor local forward_only fast_forward read_only for
+	select
+			quotename(name) as db_name_delimited
+			,'''' + replace(name, '''', '''''') + '''' as db_name_as_string
+			,replace(name, '''', '''''') as db_name_as_string_body
+		from sys.databases
+		order by 1
+open my_cursor
+while 1 = 1 begin
+	fetch next from my_cursor into
+		@db_name_delimited
+		,@db_name_as_string
+		,@db_name_as_string_body
+	if @@fetch_status != 0 break
+	declare @sql nvarchar(max) = '
+		drop table if exists #t
+		select
+				' + @db_name_as_string + ' as db_name
+				,min((s.name + '' '' + o.name + '' '')) as n2
+				,min(i.name) as i_name                        
+				,min(i.type_desc) as i_type_desc
+				,sum(used_page_count) as used_pages
+				,sum(reserved_page_count) as reserved_pages
+				,sum(row_count) as row_count
+			into #t
+			from ' + @db_name_delimited + '.sys.dm_db_partition_stats as p_stats
+				inner join ' + @db_name_delimited + '.sys.objects as o on o.object_id = p_stats.object_id
+				inner join ' + @db_name_delimited + '.sys.schemas as s on s.schema_id = o.schema_id
+				inner join ' + @db_name_delimited + '.sys.indexes as i on 
+					i.object_id = p_stats.object_id
+					and i.index_id = p_stats.index_id
+			where
+				o.is_ms_shipped = 0
+			group by
+				o.object_id
+			order by 1
+		
+		
+		insert into ##s1_9d7bdae48be3445d92c372f566f1580d
+			select
+					*
+				from #t
+	'
+	exec sp_executesql @sql;
+end;
+close my_cursor;
+deallocate my_cursor;
+select
+		*
+	from ##s1_9d7bdae48be3445d92c372f566f1580d
