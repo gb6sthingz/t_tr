@@ -1,0 +1,11 @@
+﻿CategoryName	CategoryType	CounterName	CounterType
+Memory	SingleInstance	Available Bytes	NumberOfItems64
+Memory	SingleInstance	Page Writes/sec	RateOfCountsPerSecond32
+Network Interface	MultiInstance	Output Queue Length	NumberOfItems64
+PhysicalDisk	MultiInstance	Avg. Disk Read Queue Length	5571840
+PhysicalDisk	MultiInstance	Avg. Disk Write Queue Length	5571840
+PhysicalDisk	MultiInstance	Current Disk Queue Length	NumberOfItems32
+PhysicalDisk	MultiInstance	Disk Read Bytes/sec	RateOfCountsPerSecond64
+PhysicalDisk	MultiInstance	Disk Write Bytes/sec	RateOfCountsPerSecond64
+Processor	MultiInstance	% Processor Time	Timer100NsInverse
+System	SingleInstance	Processor Queue Length	NumberOfItems32
